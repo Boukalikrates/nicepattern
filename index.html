@@ -1,0 +1,305 @@
+<!doctype html>
+<!-- 
+    MIT License
+
+Copyright (c) 2021 Boukalikrates
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ -->
+<html lang="en">
+
+<head>
+    <title>nicepattern</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            color: white;
+            background-color: black;
+            font-family: Roboto, sans-serif;
+            font-size: 30px;
+            padding: 0;
+            margin: 0;
+        }
+
+        button {
+            font-size: 30px;
+        }
+
+        svg {
+            border: 1px dashed;
+            float: left;
+            margin: 0 32px 16px 0;
+        }
+
+        path {
+            opacity: 1;
+            fill: none;
+            fill-rule: evenodd;
+            stroke: #ffffff;
+            stroke-width: 0.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        #DotM>path {
+            stroke: none;
+            fill: #ffff00;
+        }
+
+        path:nth-child(3n) {
+            stroke: #ff0000;
+        }
+
+        path:nth-child(3n-1) {
+            stroke: #ff5500;
+        }
+
+        path:nth-child(3n-2) {
+            stroke: #ffaa00;
+        }
+
+        path.in-use {
+            stroke: #ffff00;
+            marker-start: url(#DotM);
+
+        }
+    </style>
+    <script src="jquery-3.3.1.min.js">
+    </script>
+    <script>
+        var size = 128;
+        var total;
+        var lastpath;
+        var timeout;
+
+        var matrix;
+        function fancyRandom() {
+            let turnprob = Math.pow(10, +$('#turnin').val()) + 1;
+            $('#turn').html(turnprob.toFixed(2));
+            let turn = +!!Math.floor(Math.random() * turnprob);
+
+            let leftprob = Math.pow(10, +$('#leftin').val()) + 1;
+            $('#left').html(leftprob.toFixed(2));
+            let left = +!!Math.floor(Math.random() * leftprob);
+
+            return (turn * (left * 2 + 1));
+        }
+        function checkMatrix(m) {
+            for (var i = 0; i < m.length; i++) {
+                for (var j = 0; j < m[i].length; j++) {
+                    if (!m[i][j]) return false;
+                }
+            }
+            return true;
+        }
+        function getFreeCoords(m) {
+            let x;
+            let y;
+            do {
+                x = Math.floor(Math.random() * size);
+                y = Math.floor(Math.random() * size);
+            } while (m[x][y]);
+            return { x: x, y: y }
+        }
+
+        function newdirx(dir, ddir) {
+            dir += 4;
+            dir %= 4;
+            switch ((ddir + 4) % 4) {
+                case 0: return (dir % 2) * ((dir == 1) * 4 - 2);
+                case 1: return 1 - 2 * (dir == 2 || dir == 3);
+                case 2: return 0;
+                case 3: return 1 - 2 * (dir == 0 || dir == 3);
+            }
+        }
+
+
+
+
+        class Path {
+            constructor() {
+                this.elem = $('#originpath>path:first-child').clone().appendTo('#workspacepath').addClass('in-use');
+                let coords = getFreeCoords(matrix);
+                this.startY = coords.y;
+                this.startX = coords.x;
+                this.startdir = (this.startX % 2 + 5 + Math.floor(Math.random() * 2) * 2) % 4;
+                this.length = 0;
+
+                this.x = this.startX;
+                this.y = this.startY;
+                this.dir = this.startdir;
+
+
+                this.elem.attr('d', 'M ' + this.x + ',' + this.y);
+            }
+            removeClass() {
+                this.elem.removeClass('in-use')
+            }
+            drawPath(rawdir = fancyRandom()) {
+                if (false) {
+
+                } else {
+                    let dir = this.dir;
+                    //let ddir = fancyRandom();
+                    let ddir = Math.floor(rawdir % 4);
+                    // console.log((dir+ddir+4)%4+' '+this.startdir);
+
+                    let dx = newdirx(dir, ddir);
+                    let dy = newdirx(dir - 1, ddir);
+                    let nx = (this.x + dx + size) % size;
+                    let ny = (this.y + dy + size) % size;
+
+                    if (!matrix[nx][ny] && !(nx == this.startX && ny == this.startY && ((dir + ddir + 4) % 4) != this.startdir)) {
+                        matrix[nx][ny] = true;
+                        let str = '';
+
+
+                        if (this.x == 0) {
+                            if (dir == 1 && this.length != 0) {
+                                // str += ' h 2 v ' + size + 'h -' + (size + 4) + ' v -' + size + ' h 2 '
+                                str += ' m -' + size + ',0'
+                            } else if (dir == 3) {
+                                // str += ' h -2 v ' + size + 'h ' + (size + 4) + ' v -' + size + ' h -2 '
+                                str += ' m ' + size + ',0'
+                            }
+                        }
+                        if (this.y == 0) {
+                            if (dir == 2 && this.length != 0) {
+                                // str += ' v 2 h ' + size + 'v -' + (size + 4) + ' h -' + size + ' v 2 '
+                                str += ' m 0,-' + size;
+                            } else if (dir == 0) {
+                                // str += ' v -2 h ' + size + 'v ' + (size + 4) + ' h -' + size + ' v -2 '
+                                str += ' m 0,' + size;
+                            }
+                        }
+
+
+
+                        let line = ' l ' + dx + ',' + dy;
+                        let arc = ' a 1,1 0 0 ' + (+(ddir == 1)) + ' ' + dx + ',' + dy;
+                        str += ddir % 2 ? arc : line;
+                        // let str=line;
+
+
+                        this.elem.attr('d', this.elem.attr('d') + str);
+
+
+
+                        this.x = nx;
+                        this.y = ny;
+                        this.dir += ddir + 4;
+                        this.dir %= 4;
+                        this.length++;
+                        total++;
+                        $('#currentx').text(nx);
+                        $('#currenty').text(ny);
+                        $('#count').text(this.length);
+                        $('#total').text(total);
+                    } else this.drawPath(ddir + 1);
+                }
+            }
+
+        }
+        function randomPattern() {
+            if (lastpath) {
+                lastpath.drawPath();
+                if (lastpath.x != lastpath.startX || lastpath.y != lastpath.startY) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(randomPattern, 10);
+                } else {
+                    lastpath.removeClass();
+                    if (!checkMatrix(matrix)) {
+                        lastpath = new Path(); randomPattern();
+                    } else {
+                        lastpath = null;
+                    }
+                };
+            } else {
+                // lastpath = new Path(); randomPattern();
+            }
+
+
+
+        }
+        function refresh() {
+            matrix = [];
+            for (let i = 0; i < size; i++) {
+                matrix[i] = [];
+                for (let j = 0; j < size; j++) {
+                    matrix[i][j] = i % 2 == j % 2;// || i + j < 64 || i + j > 192 || j - i > 64 || i - j > 64;
+                }
+            }
+            $("#workspacepath").children().remove();
+            total = 0;
+            lastpath = new Path();
+
+            randomPattern();
+        }
+
+        $(function () {
+            let margin = 0;
+            $('svg').attr('viewBox', -margin + ' ' + -margin + ' ' + (size + 2 * margin) + ' ' + (size + 2 * margin));
+            // refresh();
+            // randomPattern();
+            $('button').click(function () {
+                refresh();
+            })
+        })
+
+    </script>
+</head>
+
+<body>
+    <article>
+        <svg width="1024" height="1024" viewbox="0 0 16 16">
+            <defs>
+                <marker id="DotM" style="overflow:visible" orient="auto-start-reverse">
+                    <path d="M 0,0 
+                        a .1,.1 0 0 0 2,0 
+                        a 1,1 0 0 0 -2,0
+                        " transform="scale(2)">
+                    </path>
+                </marker>
+            </defs>
+            <g id="originpath">
+                <path></path>
+            </g>
+            <g id="workspacepath">
+            </g>
+
+
+        </svg>
+        <div class="aside">
+            <div>current X: <output id="currentx"></output></div>
+            <div>current Y: <output id="currenty"></output></div>
+            <div>current length: <output id="count"></output></div>
+            <div>total length: <output id="total"></output></div>
+            <div>turn/straight: <output id="turn"></output><br><input id="turnin" type="range" min="-1.76091"
+                    max="1.76091" step="0.176091">
+            </div>
+            <div>left/right: <output id="left"></output><br><input id="leftin" type="range" min="-1.76091" max="1.76091"
+                    step="0.176091">
+            </div>
+            <button>refresh</button>
+        </div>
+    </article>
+</body>
+
+</html>
